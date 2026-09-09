@@ -61,3 +61,47 @@ export async function resolveClinepassModels(credentials) {
     clearTimeout(timer);
   }
 }
+
+/**
+ * Fetch Cline live model catalog from Cline's /models endpoint.
+ *
+ * @param {object} credentials - Connection credentials ({ accessToken, apiKey })
+ * @returns {Promise<{ models: { id: string, name: string }[] } | null>}
+ */
+export async function resolveClineModels(credentials) {
+  const isApiKey = Boolean(credentials?.apiKey);
+  const token = isApiKey ? credentials.apiKey : credentials?.accessToken;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const headers = token ? buildModelListHeaders(token, isApiKey) : { Accept: "application/json" };
+
+    const response = await fetch(CLINEPASS_MODELS_ENDPOINT, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    const rawList = Array.isArray(json) ? json : json?.data;
+    if (!Array.isArray(rawList)) return null;
+
+    const models = rawList
+      .filter((m) => typeof m?.id === "string")
+      .map((m) => ({
+        id: m.id,
+        name: m.name || m.id,
+      }));
+
+    return models.length ? { models } : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+

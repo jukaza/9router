@@ -1,11 +1,12 @@
-import pkg from "../../package.json" with { type: "json" };
-
-const APP_VERSION = pkg.version || "0.0.0";
+import crypto from "crypto";
 
 export function getClineAccessToken(token) {
   if (typeof token !== "string") return "";
-  const trimmed = token.trim();
+  let trimmed = token.trim();
   if (!trimmed) return "";
+  if (trimmed.startsWith("Bearer ")) {
+    trimmed = trimmed.slice(7).trim();
+  }
   return trimmed.startsWith("workos:") ? trimmed : `workos:${trimmed}`;
 }
 
@@ -17,15 +18,17 @@ export function getClineAuthorizationHeader(token) {
 export function buildClineHeaders(token, extraHeaders = {}) {
   const authorization = getClineAuthorizationHeader(token);
   const headers = {
+    "Content-Type": "application/json",
+    "User-Agent": "Cline/3.0.47",
     "HTTP-Referer": "https://cline.bot",
     "X-Title": "Cline",
-    "User-Agent": `9Router/${APP_VERSION}`,
-    "X-PLATFORM": process.platform || "unknown",
-    "X-PLATFORM-VERSION": process.version || "unknown",
-    "X-CLIENT-TYPE": "9router",
-    "X-CLIENT-VERSION": APP_VERSION,
-    "X-CORE-VERSION": APP_VERSION,
     "X-IS-MULTIROOT": "false",
+    "X-CLIENT-TYPE": "cline-sdk",
+    "X-CLIENT-VERSION": "3.0.47",
+    "X-PLATFORM": "terminal",
+    "X-PLATFORM-VERSION": "3.0.47",
+    "X-CORE-VERSION": "0.0.66",
+    "X-Task-ID": crypto.randomUUID(),
     ...extraHeaders,
   };
 
@@ -35,3 +38,4 @@ export function buildClineHeaders(token, extraHeaders = {}) {
 
   return headers;
 }
+

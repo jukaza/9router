@@ -234,6 +234,8 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         "codebuddy-intl",
         "qoder",
         "grok-cli",
+        "cline",
+        "clinepass",
       ];
       if (deviceCodeProviders.includes(provider)) {
         setIsDeviceCode(true);

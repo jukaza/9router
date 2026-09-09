@@ -172,22 +172,74 @@ export async function POST(request) {
       mergedProviderSpecificData.proxyPoolId = proxyPoolId;
     }
 
-    const newConnection = await createProviderConnection({
+    let authType = isWebCookieProvider ? "cookie" : "apikey";
+    let finalApiKey = apiKey || "";
+    let accessToken = null;
+    let refreshToken = null;
+    let expiresAt = null;
+    let email = null;
+
+    if ((provider === "cline" || provider === "clinepass") && finalApiKey) {
+      // Check if user pasted a refreshToken (like CLINE_REFRESH_TOKEN from cline2api)
+      try {
+        const trimmedKey = finalApiKey.trim();
+        const refreshRes = await fetch("https://api.cline.bot/api/v1/auth/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            refreshToken: trimmedKey,
+            grantType: "refresh_token",
+            clientType: "extension",
+          }),
+        });
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          const tokens = refreshData?.data || refreshData;
+          if (tokens?.accessToken) {
+            accessToken = tokens.accessToken;
+            refreshToken = tokens.refreshToken || trimmedKey;
+            finalApiKey = tokens.accessToken;
+            authType = "oauth";
+            if (tokens.expiresAt) {
+              expiresAt = new Date(tokens.expiresAt).toISOString();
+            } else if (tokens.expiresIn) {
+              expiresAt = new Date(Date.now() + tokens.expiresIn * 1000).toISOString();
+            }
+            if (tokens.userInfo?.email) {
+              email = tokens.userInfo.email;
+            }
+            testStatus = "active";
+          }
+        }
+      } catch (err) {
+        console.log("Error checking cline refresh token:", err);
+      }
+    }
+
+    const connectionPayload = {
       provider,
-      authType: isWebCookieProvider ? "cookie" : "apikey",
+      authType,
       name: connectionName,
-      apiKey: apiKey || "",
+      apiKey: finalApiKey,
       priority: priority || 1,
       globalPriority: globalPriority || null,
       defaultModel: defaultModel || null,
       providerSpecificData: mergedProviderSpecificData,
       isActive: true,
       testStatus: testStatus || "unknown",
-    });
+    };
+    if (accessToken) connectionPayload.accessToken = accessToken;
+    if (refreshToken) connectionPayload.refreshToken = refreshToken;
+    if (expiresAt) connectionPayload.expiresAt = expiresAt;
+    if (email) connectionPayload.email = email;
+
+    const newConnection = await createProviderConnection(connectionPayload);
 
     // Hide sensitive fields
     const result = { ...newConnection };
     delete result.apiKey;
+    delete result.accessToken;
+    delete result.refreshToken;
 
     return NextResponse.json({ connection: result }, { status: 201 });
   } catch (error) {

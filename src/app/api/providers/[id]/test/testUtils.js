@@ -83,6 +83,7 @@ const OAUTH_TEST_CONFIG = {
     authPrefix: "Bearer ",
   },
   cline: { refreshable: true },
+  clinepass: { refreshable: true },
   gitlab: {
     // Test by hitting the GitLab user API — requires api or read_user scope
     url: "https://gitlab.com/api/v4/user",
@@ -283,7 +284,7 @@ async function refreshOAuthToken(connection) {
       return { accessToken: data.accessToken, expiresIn: data.expiresIn || 3600, refreshToken: data.refreshToken || refreshToken };
     }
 
-    if (provider === "cline") {
+    if (provider === "cline" || provider === "clinepass") {
       const response = await fetch(CLINE_CONFIG.refreshUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -366,7 +367,7 @@ async function testOAuthConnection(connection, effectiveProxy = null) {
     return { valid: false, error: initial.error, refreshed };
   }
 
-  if (connection.provider === "cline") {
+  if (connection.provider === "cline" || connection.provider === "clinepass") {
     const tryProbe = async (token) => {
       const res = await probeClineAccessToken(token);
       if (res.ok) return { valid: true, error: null, refreshed, newTokens };
